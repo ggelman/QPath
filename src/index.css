@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Q-Path Dark Theme - Tech Aesthetic */
+    --background: 210 20% 7%;
+    --foreground: 213 14% 81%;
+    
+    --card: 210 24% 11%;
+    --card-foreground: 213 14% 81%;
+    
+    --popover: 210 24% 11%;
+    --popover-foreground: 213 14% 81%;
+    
+    --primary: 271 76% 53%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 213 11% 21%;
+    --secondary-foreground: 213 14% 81%;
+    
+    --muted: 213 11% 21%;
+    --muted-foreground: 213 9% 59%;
+    
+    --accent: 271 76% 53%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 213 11% 21%;
+    --input: 213 11% 21%;
+    --ring: 271 76% 53%;
+    
+    --radius: 0.75rem;
+    
+    /* Quantum Purple */
+    --quantum: 271 76% 53%;
+    --quantum-foreground: 0 0% 100%;
+    
+    /* Cybersecurity Green */
+    --cyber: 158 100% 33%;
+    --cyber-foreground: 0 0% 100%;
+    
+    /* Software Blue */
+    --software: 203 100% 40%;
+    --software-foreground: 0 0% 100%;
+    
+    /* Gamification Gold */
+    --gold: 51 100% 50%;
+    --gold-foreground: 0 0% 0%;
+    
+    /* Sidebar */
+    --sidebar-background: 210 24% 11%;
+    --sidebar-foreground: 213 14% 81%;
+    --sidebar-primary: 271 76% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 213 11% 21%;
+    --sidebar-accent-foreground: 213 14% 81%;
+    --sidebar-border: 213 11% 21%;
+    --sidebar-ring: 271 76% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, Code, Rocket, CheckSquare, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,27 +32,78 @@ const initialTasks = [
 ];
 
 export default function Projetos() {
-  const { currentUser } = useUser();
-  const [content, setContent] = useState(() => {
-    const stored = localStorage.getItem(`qpath_portfolio_${currentUser.id}`);
-    return stored || initialProjectContent;
-  });
-  const [tasks, setTasks] = useState(() => {
-    const stored = localStorage.getItem(`qpath_portfolio_tasks_${currentUser.id}`);
-    return stored ? JSON.parse(stored) : initialTasks;
-  });
+  const { currentUser, isLoading: userLoading } = useUser();
+  const [content, setContent] = useState(initialProjectContent);
+  const [tasks, setTasks] = useState(initialTasks);
   const [isPreview, setIsPreview] = useState(false);
 
+  useEffect(() => {
+    if (!currentUser) {
+      setContent(initialProjectContent);
+      setTasks(initialTasks);
+      return;
+    }
+
+    const contentKey = `qpath_portfolio_${currentUser.id}`;
+    const tasksKey = `qpath_portfolio_tasks_${currentUser.id}`;
+
+    try {
+      const storedContent = localStorage.getItem(contentKey);
+      setContent(storedContent || initialProjectContent);
+    } catch (error) {
+      console.error("Failed to load project content:", error);
+      setContent(initialProjectContent);
+    }
+
+    try {
+      const storedTasks = localStorage.getItem(tasksKey);
+      setTasks(storedTasks ? JSON.parse(storedTasks) : initialTasks);
+    } catch (error) {
+      console.error("Failed to load project tasks:", error);
+      setTasks(initialTasks);
+    }
+  }, [currentUser]);
+
   const toggleTask = (id: string) => {
-    const newTasks = tasks.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task));
-    setTasks(newTasks);
-    localStorage.setItem(`qpath_portfolio_tasks_${currentUser.id}`, JSON.stringify(newTasks));
+    setTasks((prev) => {
+      const newTasks = prev.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task));
+
+      if (currentUser) {
+        localStorage.setItem(`qpath_portfolio_tasks_${currentUser.id}`, JSON.stringify(newTasks));
+      }
+
+      return newTasks;
+    });
   };
 
   const handleContentChange = (newContent: string) => {
     setContent(newContent);
-    localStorage.setItem(`qpath_portfolio_${currentUser.id}`, newContent);
+    if (currentUser) {
+      localStorage.setItem(`qpath_portfolio_${currentUser.id}`, newContent);
+    }
   };
+
+  if (userLoading && !currentUser) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Hub de Projetos</h1>
+          <p className="text-muted-foreground mt-1">Carregando dados do usuário...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Hub de Projetos</h1>
+          <p className="text-muted-foreground mt-1">Faça login para acessar seus projetos.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

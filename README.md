@@ -106,6 +106,33 @@ npm run lint     # Verificação de código
 npm run preview  # Preview da build
 ```
 
+### **Configuração do Backend FastAPI**
+O frontend agora consome as rotas reais do backend (`/api/v1`). Para executar o fluxo ponta a ponta:
+
+1. Configure o backend seguindo as instruções de [`backend/README.md`](./backend/README.md).
+2. Garanta que as variáveis `.env` do backend estejam preenchidas (especialmente banco, Redis e chaves JWT).
+3. Inicie os serviços de suporte (`docker-compose up -d postgres redis`).
+4. Rode as migrações `poetry run alembic upgrade head`.
+5. Inicie a API: `poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`.
+
+### **Configuração do Frontend (Variáveis de Ambiente)**
+Crie um arquivo `.env.local` na raiz com o endpoint do backend:
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+```
+
+Em ambientes de produção utilize o domínio definitivo no mesmo formato.
+
+## ✅ **Validação Manual Recomendada**
+1. Inicie backend e frontend (`npm run dev`) apontando para o mesmo host.
+2. Crie um usuário pela tela de registro ou via `POST /api/v1/users/register`.
+3. Faça login e verifique no DevTools que os requests `POST /auth/login`, `GET /auth/me` e `GET /gamification/profile` retornam 200.
+4. Recarregue a página: o estado deve ser restaurado usando os tokens persistidos e um novo `GET /auth/me` deve ser disparado.
+5. Abra o menu do usuário (Sidebar) e confirme que o perfil reflete os dados reais (nome, XP, nível) vindos da API.
+6. Interaja com o Q-Mentor: ao enviar uma pergunta verifique o `POST /qmentor/guidance` e a resposta exibida no chat.
+7. Opcional: force um `401` (revogue o token no backend) e confirme que o frontend limpa a sessão após falha no refresh.
+
 ---
 
 ## 📖 **Documentação Técnica**

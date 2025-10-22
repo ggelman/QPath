@@ -54,7 +54,7 @@ export function QMentorChat() {
       
       const aiMessage: Message = {
         role: "assistant",
-        content: response.guidance || "Desculpe, não consegui processar sua pergunta no momento. Tente novamente.",
+        content: response.response || "Desculpe, não consegui processar sua pergunta no momento. Tente novamente.",
       };
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {

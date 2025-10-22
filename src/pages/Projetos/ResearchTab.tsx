@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, Upload, Calendar, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useUser } from "@/contexts/UserContext";
 
 interface Task {
@@ -95,37 +94,63 @@ A distribuição quântica de chaves (QKD - Quantum Key Distribution) representa
 [1] Bennett, C. H., & Brassard, G. (1984). Quantum cryptography...`;
 
 export function ResearchTab() {
-  const { currentUser } = useUser();
-  const [content, setContent] = useState(() => {
-    const stored = localStorage.getItem(`qpath_research_${currentUser.id}`);
-    return stored || initialContent;
-  });
-
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const stored = localStorage.getItem(`qpath_research_tasks_${currentUser.id}`);
-    return stored ? JSON.parse(stored) : initialResearchTasks;
-  });
-
-  const [milestones, setMilestones] = useState<PublicationMilestone[]>(publicationTimeline);
+  const { currentUser, isLoading: userLoading } = useUser();
+  const [content, setContent] = useState(initialContent);
+  const [tasks, setTasks] = useState<Task[]>(initialResearchTasks);
+  const milestones = publicationTimeline;
   const [aiAnalysis, setAiAnalysis] = useState<{
     clarityScore: number;
     suggestedOutline: string[];
     feedback: string;
   } | null>(null);
 
+  useEffect(() => {
+    if (!currentUser) {
+      setContent(initialContent);
+      setTasks(initialResearchTasks);
+      return;
+    }
+
+    const contentKey = `qpath_research_${currentUser.id}`;
+    const tasksKey = `qpath_research_tasks_${currentUser.id}`;
+
+    try {
+      const storedContent = localStorage.getItem(contentKey);
+      setContent(storedContent || initialContent);
+    } catch (error) {
+      console.error("Failed to load research content:", error);
+      setContent(initialContent);
+    }
+
+    try {
+      const storedTasks = localStorage.getItem(tasksKey);
+      setTasks(storedTasks ? JSON.parse(storedTasks) : initialResearchTasks);
+    } catch (error) {
+      console.error("Failed to load research tasks:", error);
+      setTasks(initialResearchTasks);
+    }
+  }, [currentUser]);
+
   const updateTask = (id: string, status: Task["status"]) => {
-    const newTasks = tasks.map((task) => (task.id === id ? { ...task, status } : task));
-    setTasks(newTasks);
-    localStorage.setItem(`qpath_research_tasks_${currentUser.id}`, JSON.stringify(newTasks));
+    setTasks((prev) => {
+      const newTasks = prev.map((task) => (task.id === id ? { ...task, status } : task));
+
+      if (currentUser) {
+        localStorage.setItem(`qpath_research_tasks_${currentUser.id}`, JSON.stringify(newTasks));
+      }
+
+      return newTasks;
+    });
   };
 
   const handleContentChange = (newContent: string) => {
     setContent(newContent);
-    localStorage.setItem(`qpath_research_${currentUser.id}`, newContent);
+    if (currentUser) {
+      localStorage.setItem(`qpath_research_${currentUser.id}`, newContent);
+    }
   };
 
   const analyzeWriting = () => {
-    // Simulação de análise de IA
     const wordCount = content.split(/\s+/).length;
     const sentenceCount = content.split(/[.!?]+/).length;
     const avgWordsPerSentence = wordCount / sentenceCount;
@@ -167,6 +192,24 @@ export function ResearchTab() {
     }
   };
 
+  if (userLoading && !currentUser) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold">Iniciação Científica</h2>
+        <p className="text-muted-foreground">Carregando dados do usuário...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold">Iniciação Científica</h2>
+        <p className="text-muted-foreground">Faça login para acompanhar sua pesquisa.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -199,129 +242,112 @@ export function ResearchTab() {
             <Textarea
               value={content}
               onChange={(e) => handleContentChange(e.target.value)}
-              className="min-h-[600px] font-mono text-sm"
-              placeholder="Escreva seu artigo científico aqui..."
+              className="min-h-[500px] font-mono text-sm"
+              placeholder="Escreva seu artigo aqui..."
             />
-            <div className="mt-4 flex justify-between items-center">
-              <p className="text-sm text-muted-foreground">
-                {content.split(/\s+/).length} palavras
-              </p>
-              <Button onClick={analyzeWriting} className="bg-quantum hover:bg-quantum/90">
-                Analisar Escrita com IA
+            <div className="flex justify-end mt-4">
+              <Button variant="outline" onClick={analyzeWriting}>
+                Analisar com IA
               </Button>
             </div>
           </div>
 
-          {/* AI Analysis Results */}
           {aiAnalysis && (
-            <div className="bg-card border border-quantum/50 rounded-xl p-6">
-              <h3 className="font-semibold mb-4 text-quantum">Análise de Escrita - Q-Mentor</h3>
-              <div className="space-y-4">
+            <div className="bg-quantum/10 border border-quantum/30 rounded-xl p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-6 h-6 text-quantum" />
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">Score de Clareza</span>
-                    <span className="text-2xl font-bold text-quantum">{aiAnalysis.clarityScore}%</span>
-                  </div>
-                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-quantum transition-all duration-500"
-                      style={{ width: `${aiAnalysis.clarityScore}%` }}
-                    />
-                  </div>
+                  <h4 className="font-semibold">Análise de Clareza</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Seu texto tem um score de clareza {aiAnalysis.clarityScore}/100
+                  </p>
                 </div>
-
-                <div>
-                  <p className="text-sm font-medium mb-2">Feedback Geral</p>
-                  <p className="text-sm text-muted-foreground">{aiAnalysis.feedback}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium mb-2">Sugestões de Melhoria</p>
-                  <ul className="space-y-2">
-                    {aiAnalysis.suggestedOutline.map((suggestion, idx) => (
-                      <li key={idx} className="text-sm text-muted-foreground flex gap-2">
-                        <span className="text-quantum">•</span>
-                        <span>{suggestion}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              </div>
+              <div>
+                <h5 className="font-medium mb-2">Sugestões de Estrutura</h5>
+                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                  {aiAnalysis.suggestedOutline.map((suggestion, index) => (
+                    <li key={index}>{suggestion}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <p>{aiAnalysis.feedback}</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Task Checklist */}
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="font-semibold mb-4">Checklist de Produção</h3>
+        {/* Tasks */}
+        <div className="space-y-4">
+          <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-quantum" />
+              Roadmap da Pesquisa
+            </h3>
             <div className="space-y-3">
-              {tasks.map((task) => (
-                <div key={task.id} className="flex items-start gap-3 p-3 bg-background rounded-lg">
-                  <div className="mt-1">{getStatusIcon(task.status)}</div>
-                  <div className="flex-1">
-                    <p className={`text-sm ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>
-                      {task.text}
-                    </p>
-                    <div className="flex gap-1 mt-2">
-                      <Button
-                        size="sm"
-                        variant={task.status === "todo" ? "default" : "ghost"}
-                        onClick={() => updateTask(task.id, "todo")}
-                        className="h-6 text-xs"
-                      >
-                        To Do
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={task.status === "progress" ? "default" : "ghost"}
-                        onClick={() => updateTask(task.id, "progress")}
-                        className={`h-6 text-xs ${task.status === "progress" ? "bg-quantum hover:bg-quantum/90" : ""}`}
-                      >
-                        Andamento
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={task.status === "done" ? "default" : "ghost"}
-                        onClick={() => updateTask(task.id, "done")}
-                        className={`h-6 text-xs ${task.status === "done" ? "bg-cyber hover:bg-cyber/90" : ""}`}
-                      >
-                        Feito
-                      </Button>
+              {milestones.map((milestone) => (
+                <div
+                  key={milestone.id}
+                  className="border border-border rounded-lg p-4 space-y-2"
+                >
+                  <div className="flex items-center gap-3">
+                    {getMilestoneIcon(milestone.status)}
+                    <div>
+                      <p className="font-semibold">{milestone.title}</p>
+                      <p className="text-sm text-muted-foreground">{milestone.date}</p>
                     </div>
                   </div>
+                  <p className="text-sm text-muted-foreground">{milestone.description}</p>
+                  {milestone.uploadedFile && (
+                    <p className="text-xs text-quantum">Arquivo enviado: {milestone.uploadedFile}</p>
+                  )}
                 </div>
               ))}
             </div>
-            <div className="mt-4 pt-4 border-t border-border">
-              <p className="text-sm text-muted-foreground">
-                Progresso: {tasks.filter((t) => t.status === "done").length} / {tasks.length}
-              </p>
-            </div>
           </div>
 
-          {/* Publication Timeline */}
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="font-semibold mb-4">Linha do Tempo de Publicação</h3>
-            <div className="space-y-4">
-              {milestones.map((milestone) => (
-                <div key={milestone.id} className="space-y-2">
-                  <div className="flex items-start gap-3">
-                    {getMilestoneIcon(milestone.status)}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs font-medium text-muted-foreground">{milestone.date}</span>
-                      </div>
-                      <p className="font-medium text-sm">{milestone.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{milestone.description}</p>
+          <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <FileText className="w-5 h-5 text-cyber" />
+              Tarefas da Pesquisa
+            </h3>
+            <div className="space-y-3">
+              {tasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="border border-border rounded-lg p-3 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    {getStatusIcon(task.status)}
+                    <div>
+                      <p className="font-medium">{task.text}</p>
+                      <p className="text-xs text-muted-foreground">Status: {task.status}</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" className="w-full gap-2">
-                    <Upload className="w-3 h-3" />
-                    Anexar Arquivo
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updateTask(task.id, "todo")}
+                    >
+                      To-do
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updateTask(task.id, "progress")}
+                    >
+                      Em Progresso
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updateTask(task.id, "done")}
+                    >
+                      Concluído
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

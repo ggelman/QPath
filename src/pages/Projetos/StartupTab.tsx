@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo, type ComponentType } from "react";
 import { Rocket, Lightbulb, Code, Map, TrendingUp } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { useUser } from "@/contexts/UserContext";
 interface Section {
   id: string;
   title: string;
-  icon: any;
+  icon: ComponentType<{ className?: string }>;
   placeholder: string;
 }
 
@@ -49,26 +49,68 @@ const sections: Section[] = [
   },
 ];
 
-export function StartupTab() {
-  const { currentUser } = useUser();
-  const [sectionContents, setSectionContents] = useState<Record<string, string>>(() => {
-    const stored = localStorage.getItem(`qpath_startup_${currentUser.id}`);
-    if (stored) return JSON.parse(stored);
+const buildEmptySections = () =>
+  sections.reduce((acc, section) => {
+    acc[section.id] = "";
+    return acc;
+  }, {} as Record<string, string>);
 
-    return sections.reduce((acc, section) => {
-      acc[section.id] = "";
-      return acc;
-    }, {} as Record<string, string>);
-  });
+export function StartupTab() {
+  const { currentUser, isLoading: userLoading } = useUser();
+  const [sectionContents, setSectionContents] = useState<Record<string, string>>(buildEmptySections);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setSectionContents(buildEmptySections());
+      return;
+    }
+
+    try {
+      const stored = localStorage.getItem(`qpath_startup_${currentUser.id}`);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Record<string, string>;
+        setSectionContents({ ...buildEmptySections(), ...parsed });
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to load startup sections:", error);
+    }
+
+    setSectionContents(buildEmptySections());
+  }, [currentUser]);
 
   const updateSection = (sectionId: string, content: string) => {
-    const newContents = { ...sectionContents, [sectionId]: content };
-    setSectionContents(newContents);
-    localStorage.setItem(`qpath_startup_${currentUser.id}`, JSON.stringify(newContents));
+    setSectionContents((prev) => {
+      const updated = { ...prev, [sectionId]: content };
+      if (currentUser) {
+        localStorage.setItem(`qpath_startup_${currentUser.id}`, JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
-  const totalProgress = Object.values(sectionContents).filter((c) => c.trim().length > 50).length;
+  const totalProgress = useMemo(() =>
+    Object.values(sectionContents).filter((c) => c.trim().length > 50).length,
+  [sectionContents]);
   const progressPercentage = (totalProgress / sections.length) * 100;
+
+  if (userLoading && !currentUser) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold">Q-Shield Logistics - MVP</h2>
+        <p className="text-muted-foreground">Carregando dados do usuário...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold">Q-Shield Logistics - MVP</h2>
+        <p className="text-muted-foreground">Faça login para editar o plano da startup.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -99,7 +141,8 @@ export function StartupTab() {
       <div className="grid gap-6">
         {sections.map((section) => {
           const Icon = section.icon;
-          const hasContent = sectionContents[section.id]?.trim().length > 50;
+          const value = sectionContents[section.id] ?? "";
+          const hasContent = value.trim().length > 50;
 
           return (
             <div key={section.id} className="bg-card border border-border rounded-xl p-6">
@@ -116,7 +159,7 @@ export function StartupTab() {
               </div>
 
               <Textarea
-                value={sectionContents[section.id]}
+                value={value}
                 onChange={(e) => updateSection(section.id, e.target.value)}
                 placeholder={section.placeholder}
                 className="min-h-[200px] font-mono text-sm"
@@ -124,7 +167,7 @@ export function StartupTab() {
 
               <div className="mt-3 flex justify-between items-center">
                 <p className="text-xs text-muted-foreground">
-                  {sectionContents[section.id]?.split(/\s+/).filter(Boolean).length || 0} palavras
+                  {value.split(/\s+/).filter(Boolean).length || 0} palavras
                 </p>
                 {!hasContent && (
                   <p className="text-xs text-muted-foreground">Mínimo recomendado: 50 palavras</p>

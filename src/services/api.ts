@@ -37,6 +37,122 @@ export interface QMentorHealthResponse {
   message: string;
 }
 
+export interface GamificationProfile {
+  id: number;
+  user_id: number;
+  total_xp: number;
+  current_level: string;
+  current_streak: number;
+  longest_streak: number;
+  completed_trilhas: number;
+  completed_projects: number;
+  pomodoro_sessions: number;
+  last_activity_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StudyTask {
+  id: number;
+  user_id: number;
+  title: string;
+  due_date: string | null;
+  completed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type StudyTaskPayload = Pick<StudyTask, 'title' | 'due_date' | 'completed'>;
+
+export interface WeekProgressDay {
+  day: string;
+  hours: number;
+}
+
+export interface WeekProgress {
+  streak: number;
+  total_hours: number;
+  week: WeekProgressDay[];
+}
+
+export interface TrackSummaryItem {
+  track_id: number;
+  slug: string;
+  name: string;
+  color: string;
+  progress: number;
+}
+
+export interface DashboardData {
+  tasks: StudyTask[];
+  week_progress: WeekProgress;
+  track_summary: TrackSummaryItem[];
+}
+
+export interface UserReward {
+  id: number;
+  user_id: number;
+  condition: string;
+  reward: string;
+  achieved: boolean;
+  achieved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  unlocked: boolean;
+}
+
+export interface ProfileStats {
+  total_xp: number;
+  current_level: string;
+  total_hours: number;
+  completed_lessons: number;
+  total_lessons: number;
+  pomodoro_sessions: number;
+}
+
+export interface TrackLesson {
+  id: number;
+  slug: string;
+  title: string;
+  order: number;
+  completed: boolean;
+}
+
+export interface TrackModule {
+  id: number;
+  slug: string;
+  title: string;
+  description?: string | null;
+  order: number;
+  progress: number;
+  lessons: TrackLesson[];
+}
+
+export interface Track {
+  id: number;
+  slug: string;
+  name: string;
+  description?: string | null;
+  color: string;
+  progress: number;
+  modules: TrackModule[];
+}
+
+export interface ProfileDetails {
+  profile: GamificationProfile;
+  achievements: Achievement[];
+  rewards: UserReward[];
+  stats: ProfileStats;
+  week_progress: WeekProgress;
+  tracks: Track[];
+}
+
 class ApiService {
   private readonly baseURL: string;
   private token: string | null = null;
@@ -216,18 +332,84 @@ class ApiService {
   }
 
   // Gamification methods
-  async getGamificationProfile(): Promise<Record<string, unknown>> {
+  async getGamificationProfile(): Promise<GamificationProfile> {
     return this.request('/gamification/profile');
   }
 
-  async updateXP(activityType: string, xpAmount: number): Promise<Record<string, unknown>> {
-    return this.request('/gamification/update-xp', {
+  async getDashboardData(): Promise<DashboardData> {
+    return this.request('/gamification/dashboard');
+  }
+
+  async syncDashboardTasks(tasks: StudyTaskPayload[]): Promise<StudyTask[]> {
+    return this.request('/gamification/tasks', {
+      method: 'PUT',
+      body: JSON.stringify(tasks),
+    });
+  }
+
+  async toggleTaskCompletion(taskId: number, completed: boolean): Promise<StudyTask> {
+    return this.request(`/gamification/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ completed }),
+    });
+  }
+
+  async logPomodoroSession(durationMinutes: number): Promise<GamificationProfile> {
+    return this.request(`/gamification/pomodoro-session?duration_minutes=${durationMinutes}`, {
+      method: 'POST',
+    });
+  }
+
+  async updateXP(activityType: string, xpAmount: number, description: string): Promise<GamificationProfile> {
+    return this.request('/gamification/add-xp', {
       method: 'POST',
       body: JSON.stringify({
         activity_type: activityType,
         xp_amount: xpAmount,
+        description,
       }),
     });
+  }
+
+  async getProfileDetails(): Promise<ProfileDetails> {
+    return this.request('/gamification/profile/details');
+  }
+
+  async getRewards(): Promise<UserReward[]> {
+    return this.request('/gamification/rewards');
+  }
+
+  async createReward(reward: Pick<UserReward, 'condition' | 'reward'>): Promise<UserReward> {
+    return this.request('/gamification/rewards', {
+      method: 'POST',
+      body: JSON.stringify(reward),
+    });
+  }
+
+  async updateReward(
+    rewardId: number,
+    update: Partial<Pick<UserReward, 'condition' | 'reward'> & { achieved: boolean }>,
+  ): Promise<UserReward> {
+    return this.request(`/gamification/rewards/${rewardId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(update),
+    });
+  }
+
+  async getTracks(): Promise<Track[]> {
+    return this.request('/tracks/');
+  }
+
+  async getTrackSummary(): Promise<TrackSummaryItem[]> {
+    return this.request('/tracks/summary');
+  }
+
+  async updateLessonCompletion(lessonId: number, completed: boolean): Promise<boolean> {
+    const response = await this.request<{ success: boolean }>(`/tracks/lessons/${lessonId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ completed }),
+    });
+    return response.success;
   }
 
   // Projects methods

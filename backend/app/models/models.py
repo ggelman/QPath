@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import UniqueConstraint
 from pydantic import field_validator
 from datetime import datetime
 from typing import Optional, List
@@ -82,7 +83,10 @@ class User(UserBase, BaseModel, table=True):
     # Relationships
     gamification_profile: Optional["GamificationProfile"] = Relationship(back_populates="user")
     activity_logs: List["ActivityLog"] = Relationship(back_populates="user")
-    project_submissions: List["UserProjectSubmission"] = Relationship(back_populates="user")
+    project_submissions: List["UserProjectSubmission"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "UserProjectSubmission.user_id"},
+    )
 
 
 class UserCreate(UserBase):
@@ -197,9 +201,12 @@ class UserProjectSubmissionBase(SQLModel):
 class UserProjectSubmission(UserProjectSubmissionBase, BaseModel, table=True):
     """User project submission table model"""
     __tablename__ = "user_project_submissions"
-    
+
     # Relationships
-    user: Optional[User] = Relationship(back_populates="project_submissions")
+    user: Optional[User] = Relationship(
+        back_populates="project_submissions",
+        sa_relationship_kwargs={"foreign_keys": "UserProjectSubmission.user_id"},
+    )
 
 
 class UserProjectSubmissionCreate(SQLModel):
@@ -228,6 +235,247 @@ class UserProjectSubmissionResponse(UserProjectSubmissionBase):
     id: int
     created_at: datetime
     updated_at: datetime
+
+
+# Study task models for dashboard planning
+class StudyTaskBase(SQLModel):
+    """Base study task model"""
+    user_id: int = Field(foreign_key=USERS_TABLE_REF)
+    title: str = Field(max_length=255)
+    due_date: Optional[str] = Field(default=None, max_length=50)
+    completed: bool = Field(default=False)
+
+
+class StudyTask(StudyTaskBase, BaseModel, table=True):
+    """Study task table"""
+    __tablename__ = "study_tasks"
+
+
+class StudyTaskCreate(SQLModel):
+    """Study task creation schema"""
+    title: str
+    due_date: Optional[str] = None
+    completed: bool = False
+
+
+class StudyTaskUpdate(SQLModel):
+    """Study task update schema"""
+    title: Optional[str] = None
+    due_date: Optional[str] = None
+    completed: Optional[bool] = None
+
+
+class StudyTaskResponse(StudyTaskBase):
+    """Study task response schema"""
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class StudyTaskCompletionUpdate(SQLModel):
+    """Payload for toggling task completion"""
+    completed: bool
+
+
+class StudySession(BaseModel, table=True):
+    """Study session (Pomodoro) tracking table"""
+    __tablename__ = "study_sessions"
+
+    user_id: int = Field(foreign_key=USERS_TABLE_REF)
+    duration_minutes: int = Field(ge=1, le=240)
+    session_date: datetime = Field(default_factory=datetime.utcnow)
+
+
+# Custom reward models
+class UserRewardBase(SQLModel):
+    """Base reward model"""
+    user_id: int = Field(foreign_key=USERS_TABLE_REF)
+    condition: str = Field(max_length=255)
+    reward: str = Field(max_length=255)
+    achieved: bool = Field(default=False)
+    achieved_at: Optional[datetime] = None
+
+
+class UserReward(UserRewardBase, BaseModel, table=True):
+    """User-defined reward table"""
+    __tablename__ = "user_rewards"
+
+
+class UserRewardCreate(SQLModel):
+    """Reward creation schema"""
+    condition: str
+    reward: str
+
+
+class UserRewardUpdate(SQLModel):
+    """Reward update schema"""
+    condition: Optional[str] = None
+    reward: Optional[str] = None
+    achieved: Optional[bool] = None
+
+
+class UserRewardResponse(UserRewardBase):
+    """Reward response schema"""
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+# Learning track models
+class LearningTrackBase(SQLModel):
+    """Base learning track model"""
+    slug: str = Field(unique=True, index=True, max_length=100)
+    name: str = Field(max_length=255)
+    description: Optional[str] = Field(default=None, max_length=1000)
+    color: str = Field(default="quantum", max_length=50)
+
+
+class LearningTrack(LearningTrackBase, BaseModel, table=True):
+    """Learning track table"""
+    __tablename__ = "learning_tracks"
+
+    modules: List["TrackModule"] = Relationship(back_populates="track")
+
+
+class TrackModuleBase(SQLModel):
+    """Base track module model"""
+    track_id: int = Field(foreign_key="learning_tracks.id")
+    slug: str = Field(unique=True, index=True, max_length=100)
+    title: str = Field(max_length=255)
+    description: Optional[str] = Field(default=None, max_length=1000)
+    order: int = Field(default=0)
+
+
+class TrackModule(TrackModuleBase, BaseModel, table=True):
+    """Track module table"""
+    __tablename__ = "track_modules"
+
+    track: Optional[LearningTrack] = Relationship(back_populates="modules")
+    lessons: List["TrackLesson"] = Relationship(back_populates="module")
+
+
+class TrackLessonBase(SQLModel):
+    """Base track lesson model"""
+    module_id: int = Field(foreign_key="track_modules.id")
+    slug: str = Field(unique=True, index=True, max_length=100)
+    title: str = Field(max_length=255)
+    order: int = Field(default=0)
+
+
+class TrackLesson(TrackLessonBase, BaseModel, table=True):
+    """Track lesson table"""
+    __tablename__ = "track_lessons"
+
+    module: Optional[TrackModule] = Relationship(back_populates="lessons")
+    user_progresses: List["UserLessonProgress"] = Relationship(back_populates="lesson")
+
+
+class UserLessonProgress(SQLModel, table=True):
+    """User lesson completion tracking"""
+    __tablename__ = "user_lesson_progress"
+    __table_args__ = (UniqueConstraint("user_id", "lesson_id", name="uq_user_lesson"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key=USERS_TABLE_REF)
+    lesson_id: int = Field(foreign_key="track_lessons.id")
+    completed: bool = Field(default=False)
+    completed_at: Optional[datetime] = None
+
+    lesson: Optional[TrackLesson] = Relationship(back_populates="user_progresses")
+
+
+class LessonCompletionUpdate(SQLModel):
+    """Payload for marking lesson completion"""
+    completed: bool
+
+
+class TrackLessonResponse(SQLModel):
+    """Lesson response with completion"""
+    id: int
+    slug: str
+    title: str
+    order: int
+    completed: bool
+
+
+class TrackModuleResponse(SQLModel):
+    """Module response"""
+    id: int
+    slug: str
+    title: str
+    description: Optional[str]
+    order: int
+    progress: float
+    lessons: List[TrackLessonResponse]
+
+
+class TrackResponse(SQLModel):
+    """Track response"""
+    id: int
+    slug: str
+    name: str
+    description: Optional[str]
+    color: str
+    progress: float
+    modules: List[TrackModuleResponse]
+
+
+class TrackSummaryItem(SQLModel):
+    """Track summary data for dashboard"""
+    track_id: int
+    slug: str
+    name: str
+    color: str
+    progress: float
+
+
+class WeekProgressDay(SQLModel):
+    """Week progress entry"""
+    day: str
+    hours: float
+
+
+class WeekProgressResponse(SQLModel):
+    """Weekly progress response"""
+    streak: int
+    total_hours: float
+    week: List[WeekProgressDay]
+
+
+# Aggregated responses for frontend views
+class AchievementResponse(SQLModel):
+    """Achievement data"""
+    id: str
+    name: str
+    description: str
+    unlocked: bool
+
+
+class ProfileStatsResponse(SQLModel):
+    """Additional stats for profile view"""
+    total_xp: int
+    current_level: GamificationLevel
+    total_hours: float
+    completed_lessons: int
+    total_lessons: int
+    pomodoro_sessions: int
+
+
+class DashboardResponse(SQLModel):
+    """Dashboard aggregated data"""
+    tasks: List[StudyTaskResponse]
+    week_progress: WeekProgressResponse
+    track_summary: List[TrackSummaryItem]
+
+
+class ProfileDetailsResponse(SQLModel):
+    """Detailed profile response with achievements"""
+    profile: GamificationProfileResponse
+    achievements: List[AchievementResponse]
+    rewards: List[UserRewardResponse]
+    stats: ProfileStatsResponse
+    week_progress: WeekProgressResponse
+    tracks: List[TrackResponse]
 
 
 # Token models for authentication

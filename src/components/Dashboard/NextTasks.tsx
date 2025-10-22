@@ -2,15 +2,15 @@ import { Calendar, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Task {
-  id: string;
+  id: number;
   title: string;
-  date: string;
+  dueDate?: string | null;
   completed: boolean;
 }
 
 interface NextTasksProps {
   tasks: Task[];
-  onToggleTask: (id: string) => void;
+  onToggleTask: (id: number) => void;
 }
 
 export function NextTasks({ tasks, onToggleTask }: NextTasksProps) {
@@ -43,7 +43,9 @@ export function NextTasks({ tasks, onToggleTask }: NextTasksProps) {
               <p className={`font-medium ${task.completed ? "line-through text-muted-foreground" : ""}`}>
                 {task.title}
               </p>
-              <p className="text-sm text-muted-foreground">{task.date}</p>
+              <p className="text-sm text-muted-foreground">
+                {task.dueDate ?? 'Sem data definida'}
+              </p>
             </div>
           </div>
         ))}

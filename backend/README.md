@@ -154,13 +154,25 @@ ALLOWED_HOSTS=["localhost", "127.0.0.1"]
 - `GET /` - Listar usuários (admin)
 
 ### Gamificação (`/api/v1/gamification`)
-- `GET /profile` - Perfil de gamificação
+- `GET /dashboard` - Dados agregados do dashboard (tarefas, progresso semanal e resumo das trilhas)
+- `PUT /tasks` - Sincronizar tarefas do dashboard (migração a partir do `localStorage`)
+- `PATCH /tasks/{task_id}` - Atualizar conclusão de uma tarefa
+- `POST /pomodoro-session` - Registrar sessão Pomodoro (atualiza XP e streaks)
+- `POST /add-xp` - Adicionar XP (requer `description` para auditoria)
+- `GET /rewards` - Listar recompensas personalizadas do usuário
+- `POST /rewards` - Criar nova recompensa personalizada
+- `PATCH /rewards/{reward_id}` - Atualizar/confirmar recompensa existente
+- `GET /profile/details` - Perfil completo com conquistas, recompensas, estatísticas e trilhas
+- `GET /profile` - Perfil de gamificação resumido
 - `POST /complete-trilha` - Completar trilha
-- `POST /pomodoro-session` - Log sessão Pomodoro
-- `POST /add-xp` - Adicionar XP
 - `GET /activity-logs` - Histórico de atividades
 - `GET /leaderboard` - Ranking
 - `GET /profile/{user_id}` - Perfil público
+
+### Trilhas (`/api/v1/tracks`)
+- `GET /` - Listar trilhas com módulos, lições e progresso do usuário
+- `GET /summary` - Resumo compacto de progresso por trilha (usado no dashboard)
+- `PATCH /lessons/{lesson_id}` - Atualizar conclusão de lição específica
 
 ### Projetos (`/api/v1/projects`)
 - `POST /submit` - Submeter projeto

@@ -1,13 +1,12 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from fastapi import Depends, HTTPException, status
 from sqlmodel import Session
 from app.core.database import get_session
 from app.repositories.base import UserRepository, GamificationRepository, ProjectRepository
 from app.models.models import (
     User, UserCreate, UserUpdate, UserResponse,
-    GamificationProfile, GamificationProfileResponse,
-    ActivityLog, ActivityLogResponse, ActivityType,
-    UserProjectSubmission, UserProjectSubmissionCreate, 
+    ActivityType,
+    UserProjectSubmission, UserProjectSubmissionCreate,
     UserProjectSubmissionUpdate, UserProjectSubmissionResponse
 )
 from datetime import datetime, timezone
@@ -118,104 +117,6 @@ class UserService:
         """Get all users (admin only)"""
         users = self.user_repo.get_all(skip=skip, limit=limit)
         return [UserResponse.model_validate(user) for user in users]
-
-
-class GamificationService:
-    """Service layer for gamification operations"""
-    
-    def __init__(self, session: Session = Depends(get_session)):
-        self.session = session
-        self.gamification_repo = GamificationRepository(session)
-    
-    def get_user_profile(self, user_id: int) -> Optional[GamificationProfileResponse]:
-        """Get user's gamification profile"""
-        profile = self.gamification_repo.get_profile(user_id)
-        if not profile:
-            return None
-        
-        return GamificationProfileResponse.model_validate(profile)
-    
-    def add_xp(self, user_id: int, xp_amount: int, activity_type: ActivityType, description: str, metadata: Optional[Dict] = None) -> GamificationProfileResponse:
-        """Add XP to user"""
-        profile = self.gamification_repo.add_xp(
-            user_id=user_id,
-            xp_amount=xp_amount,
-            activity_type=activity_type,
-            description=description,
-            metadata=metadata
-        )
-        
-        return GamificationProfileResponse.model_validate(profile)
-    
-    def complete_trilha(self, user_id: int, trilha_name: str, xp_earned: int = 100) -> GamificationProfileResponse:
-        """Complete a trilha and award XP"""
-        profile = self.gamification_repo.get_profile(user_id)
-        if profile:
-            profile.completed_trilhas += 1
-            profile.updated_at = datetime.now(timezone.utc)
-            self.session.commit()
-        
-        # Add XP for completion
-        updated_profile = self.gamification_repo.add_xp(
-            user_id=user_id,
-            xp_amount=xp_earned,
-            activity_type=ActivityType.TRILHA_COMPLETION,
-            description=f"Trilha '{trilha_name}' completada!",
-            metadata={"trilha_name": trilha_name, "xp_earned": xp_earned}
-        )
-        
-        return GamificationProfileResponse.model_validate(updated_profile)
-    
-    def log_pomodoro_session(self, user_id: int, duration_minutes: int) -> GamificationProfileResponse:
-        """Log pomodoro session and award XP"""
-        # Award XP based on session duration (1 XP per minute)
-        xp_amount = min(duration_minutes, 60)  # Cap at 60 XP per session
-        
-        profile = self.gamification_repo.get_profile(user_id)
-        if profile:
-            profile.pomodoro_sessions += 1
-            profile.updated_at = datetime.now(timezone.utc)
-            self.session.commit()
-        
-        updated_profile = self.gamification_repo.add_xp(
-            user_id=user_id,
-            xp_amount=xp_amount,
-            activity_type=ActivityType.POMODORO_SESSION,
-            description=f"Sessão Pomodoro de {duration_minutes} minutos concluída!",
-            metadata={"duration_minutes": duration_minutes, "xp_earned": xp_amount}
-        )
-        
-        return GamificationProfileResponse.model_validate(updated_profile)
-    
-    def get_activity_logs(self, user_id: int, skip: int = 0, limit: int = 50) -> List[ActivityLogResponse]:
-        """Get user's activity logs"""
-        activities = self.gamification_repo.get_activity_logs(user_id, skip=skip, limit=limit)
-        return [ActivityLogResponse.model_validate(activity) for activity in activities]
-    
-    def get_leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get XP leaderboard"""
-        # This would need a more complex query, but for now we'll implement a basic version
-        from sqlmodel import select
-        
-        try:
-            statement = select(GamificationProfile).order_by(GamificationProfile.total_xp.desc()).limit(limit)
-            profiles = list(self.session.exec(statement).all())
-            
-            leaderboard = []
-            for rank, profile in enumerate(profiles, 1):
-                user = self.session.get(User, profile.user_id)
-                leaderboard.append({
-                    "rank": rank,
-                    "username": user.username if user else "Unknown",
-                    "total_xp": profile.total_xp,
-                    "level": profile.current_level,
-                    "completed_trilhas": profile.completed_trilhas
-                })
-            
-            return leaderboard
-        except Exception as e:
-            logger.error("Error getting leaderboard: %s", str(e))
-            return []
 
 
 class ProjectService:

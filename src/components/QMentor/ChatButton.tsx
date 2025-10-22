@@ -52,9 +52,14 @@ export function QMentorChat() {
       // Ask Q-Mentor using the hook
       const response = await askQuestion(userInput);
       
+      const aiContent =
+        response.guidance?.trim() ||
+        response.response?.trim() ||
+        "Desculpe, não consegui processar sua pergunta no momento. Tente novamente.";
+
       const aiMessage: Message = {
         role: "assistant",
-        content: response.response || "Desculpe, não consegui processar sua pergunta no momento. Tente novamente.",
+        content: aiContent,
       };
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {

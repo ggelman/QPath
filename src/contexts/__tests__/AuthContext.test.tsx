@@ -9,16 +9,16 @@ const {
   loginMock,
   registerMock,
   logoutMock,
-  refreshMock,
+  refreshSessionMock,
   getCurrentUserMock,
-  clearTokenMock,
+  clearTokensMock,
 } = vi.hoisted(() => ({
   loginMock: vi.fn(),
   registerMock: vi.fn(),
   logoutMock: vi.fn(),
-  refreshMock: vi.fn(),
+  refreshSessionMock: vi.fn(),
   getCurrentUserMock: vi.fn(),
-  clearTokenMock: vi.fn(),
+  clearTokensMock: vi.fn(),
 }));
 
 vi.mock("@/services/api", () => ({
@@ -26,9 +26,18 @@ vi.mock("@/services/api", () => ({
     login: loginMock,
     register: registerMock,
     logout: logoutMock,
-    refreshToken: refreshMock,
+    refreshSession: refreshSessionMock,
     getCurrentUser: getCurrentUserMock,
-    clearToken: clearTokenMock,
+    clearTokens: clearTokensMock,
+  },
+  ApiError: class ApiError extends Error {
+    status?: number;
+
+    constructor(message: string, status?: number) {
+      super(message);
+      this.name = "ApiError";
+      this.status = status;
+    }
   },
 }));
 

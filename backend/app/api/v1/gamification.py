@@ -1,13 +1,23 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer
 from sqlmodel import Session
 from typing import List
+
 from app.core.database import get_session
-from app.core.auth import get_current_active_user, optional_authentication
-from app.services.user_service import GamificationService
+from app.core.auth import get_current_active_user
+from app.services.gamification_service import GamificationService
 from app.models.models import (
-    UserResponse, GamificationProfileResponse, 
-    ActivityLogResponse, ActivityType
+    UserResponse,
+    GamificationProfileResponse,
+    ActivityLogResponse,
+    ActivityType,
+    StudyTaskCreate,
+    StudyTaskResponse,
+    StudyTaskCompletionUpdate,
+    DashboardResponse,
+    UserRewardCreate,
+    UserRewardUpdate,
+    UserRewardResponse,
+    ProfileDetailsResponse,
 )
 import logging
 
@@ -32,6 +42,120 @@ async def get_gamification_profile(
         )
     
     return profile
+
+
+@router.get("/dashboard", response_model=DashboardResponse)
+async def get_dashboard_data(
+    current_user: UserResponse = Depends(get_current_active_user),
+    session: Session = Depends(get_session)
+):
+    """Aggregate dashboard data for the current user"""
+    gamification_service = GamificationService(session)
+    return gamification_service.get_dashboard_data(current_user.id)
+
+
+@router.put("/tasks", response_model=List[StudyTaskResponse])
+async def sync_tasks(
+    tasks: List[StudyTaskCreate],
+    current_user: UserResponse = Depends(get_current_active_user),
+    session: Session = Depends(get_session)
+):
+    """Replace dashboard tasks (used for migration from localStorage)"""
+    gamification_service = GamificationService(session)
+
+    if tasks:
+        payload = [task.model_dump() for task in tasks]
+        return gamification_service.replace_tasks(current_user.id, payload)
+
+    # No tasks provided - return existing tasks to keep defaults
+    return gamification_service.get_dashboard_data(current_user.id).tasks
+
+
+@router.patch("/tasks/{task_id}", response_model=StudyTaskResponse)
+async def update_task_completion(
+    task_id: int,
+    update: StudyTaskCompletionUpdate,
+    current_user: UserResponse = Depends(get_current_active_user),
+    session: Session = Depends(get_session)
+):
+    """Toggle completion state of a dashboard task"""
+    gamification_service = GamificationService(session)
+    updated = gamification_service.update_task_completion(
+        user_id=current_user.id,
+        task_id=task_id,
+        completed=update.completed,
+    )
+
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+
+    return updated
+
+
+@router.get("/rewards", response_model=List[UserRewardResponse])
+async def list_rewards(
+    current_user: UserResponse = Depends(get_current_active_user),
+    session: Session = Depends(get_session)
+):
+    """List custom rewards for the current user"""
+    gamification_service = GamificationService(session)
+    return gamification_service.get_rewards(current_user.id)
+
+
+@router.post("/rewards", response_model=UserRewardResponse, status_code=status.HTTP_201_CREATED)
+async def create_reward(
+    reward: UserRewardCreate,
+    current_user: UserResponse = Depends(get_current_active_user),
+    session: Session = Depends(get_session)
+):
+    """Create a custom reward"""
+    if not reward.condition.strip() or not reward.reward.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Condition and reward must be provided",
+        )
+
+    gamification_service = GamificationService(session)
+    return gamification_service.create_reward(current_user.id, reward)
+
+
+@router.patch("/rewards/{reward_id}", response_model=UserRewardResponse)
+async def update_reward(
+    reward_id: int,
+    update: UserRewardUpdate,
+    current_user: UserResponse = Depends(get_current_active_user),
+    session: Session = Depends(get_session)
+):
+    """Update or mark a reward as achieved"""
+    if update.achieved is None and not update.condition and not update.reward:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields provided for update",
+        )
+
+    gamification_service = GamificationService(session)
+    updated = gamification_service.update_reward(current_user.id, reward_id, update)
+
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reward not found",
+        )
+
+    return updated
+
+
+@router.get("/profile/details", response_model=ProfileDetailsResponse)
+async def get_profile_details(
+    current_user: UserResponse = Depends(get_current_active_user),
+    session: Session = Depends(get_session)
+):
+    """Return extended profile details with achievements and rewards"""
+    gamification_service = GamificationService(session)
+    return gamification_service.get_profile_details(current_user.id)
 
 
 @router.post("/complete-trilha", response_model=GamificationProfileResponse)

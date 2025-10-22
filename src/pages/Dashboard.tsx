@@ -1,59 +1,176 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PomodoroTimer } from "@/components/Dashboard/PomodoroTimer";
 import { WeekProgress } from "@/components/Dashboard/WeekProgress";
 import { NextTasks } from "@/components/Dashboard/NextTasks";
 import { TrackSummary } from "@/components/Dashboard/TrackSummary";
+import apiService, {
+  DashboardData,
+  StudyTask,
+  StudyTaskPayload,
+  TrackSummaryItem,
+  WeekProgress as WeekProgressType,
+} from "@/services/api";
 
-const initialTasks = [
-  { id: "1", title: "Estudar Cambridge C1 - Writing Module", date: "15 Dez 2025", completed: false },
-  { id: "2", title: "Completar módulo de Vetores - Quantum", date: "18 Dez 2025", completed: false },
-  { id: "3", title: "Revisar conceitos de RSA - Cybersecurity", date: "20 Dez 2025", completed: false },
-];
+interface DisplayTask {
+  id: number;
+  title: string;
+  dueDate?: string | null;
+  completed: boolean;
+}
 
-const weekData = [
-  { day: "Seg", hours: 2.5 },
-  { day: "Ter", hours: 3 },
-  { day: "Qua", hours: 1.5 },
-  { day: "Qui", hours: 3.5 },
-  { day: "Sex", hours: 0 },
-  { day: "Sáb", hours: 0 },
-  { day: "Dom", hours: 0 },
-];
+function formatDueDate(date: string | null | undefined): string | null {
+  if (!date) {
+    return null;
+  }
+
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) {
+    return date;
+  }
+
+  return parsed.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function mapTasksForDisplay(tasks: StudyTask[]): DisplayTask[] {
+  return tasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+    dueDate: formatDueDate(task.due_date),
+    completed: task.completed,
+  }));
+}
+
+function mapWeekData(weekProgress: WeekProgressType | null) {
+  return weekProgress?.week.map((day) => ({ day: day.day, hours: day.hours })) ?? [];
+}
 
 export default function Dashboard() {
-  const [tasks, setTasks] = useState(initialTasks);
+  const [tasks, setTasks] = useState<StudyTask[]>([]);
+  const [weekProgress, setWeekProgress] = useState<WeekProgressType | null>(null);
+  const [trackSummary, setTrackSummary] = useState<TrackSummaryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleToggleTask = (id: string) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
+  const loadDashboard = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data: DashboardData = await apiService.getDashboardData();
+      setTasks(data.tasks);
+      setWeekProgress(data.week_progress);
+      setTrackSummary(data.track_summary);
+    } catch (err) {
+      console.error("Failed to load dashboard data", err);
+      setError("Não foi possível carregar os dados do dashboard.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const migrateLegacyTasks = async () => {
+      const legacy = localStorage.getItem("qpath_dashboard_tasks");
+      if (!legacy) {
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(legacy) as unknown;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const payload = parsed.reduce<StudyTaskPayload[]>((acc, item) => {
+            if (typeof item !== "object" || item === null) {
+              return acc;
+            }
+
+            const record = item as Record<string, unknown>;
+            const title = record.title;
+            if (typeof title !== "string") {
+              return acc;
+            }
+
+            const dueValue = record.due_date ?? record.date;
+            const dueDate = typeof dueValue === "string" ? dueValue : null;
+
+            acc.push({
+              title,
+              due_date: dueDate,
+              completed: Boolean(record.completed),
+            });
+            return acc;
+          }, []);
+
+          if (payload.length) {
+            await apiService.syncDashboardTasks(payload);
+          }
+        }
+      } catch (migrationError) {
+        console.warn("Failed to migrate legacy dashboard tasks", migrationError);
+      } finally {
+        localStorage.removeItem("qpath_dashboard_tasks");
+      }
+    };
+
+    migrateLegacyTasks().finally(loadDashboard);
+  }, [loadDashboard]);
+
+  const handleToggleTask = async (taskId: number) => {
+    const currentTask = tasks.find((task) => task.id === taskId);
+    if (!currentTask) {
+      return;
+    }
+
+    try {
+      const updated = await apiService.toggleTaskCompletion(taskId, !currentTask.completed);
+      setTasks((prev) => prev.map((task) => (task.id === updated.id ? updated : task)));
+    } catch (err) {
+      console.error("Failed to update task", err);
+      setError("Não foi possível atualizar a tarefa. Tente novamente.");
+    }
+  };
+
+  const handlePomodoroComplete = async (durationMinutes: number) => {
+    try {
+      await apiService.logPomodoroSession(durationMinutes);
+      await loadDashboard();
+    } catch (err) {
+      console.error("Failed to registrar sessão pomodoro", err);
+      setError("Não foi possível registrar a sessão Pomodoro.");
+    }
+  };
+
+  const displayTasks = useMemo(() => mapTasksForDisplay(tasks), [tasks]);
+  const weekData = useMemo(() => mapWeekData(weekProgress), [weekProgress]);
+  const streak = weekProgress?.streak ?? 0;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground mt-1">Carregando seus dados...</p>
+      </div>
     );
-  };
-
-  const handlePomodoroComplete = () => {
-    // Could trigger XP gain here
-    console.log("Pomodoro completed! +10 XP");
-  };
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground mt-1">Sua central de controle</p>
+        {error && <p className="text-sm text-destructive mt-2">{error}</p>}
       </div>
 
-      {/* Pomodoro - Full Width */}
       <PomodoroTimer onComplete={handlePomodoroComplete} />
 
-      {/* Two Column Grid */}
       <div className="grid md:grid-cols-2 gap-6">
-        <WeekProgress weekData={weekData} streak={4} />
-        <NextTasks tasks={tasks} onToggleTask={handleToggleTask} />
+        <WeekProgress weekData={weekData} streak={streak} />
+        <NextTasks tasks={displayTasks} onToggleTask={handleToggleTask} />
       </div>
 
-      {/* Track Summary */}
-      <TrackSummary />
+      <TrackSummary tracks={trackSummary} />
     </div>
   );
 }

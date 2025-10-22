@@ -13,7 +13,7 @@ const TIMER_DURATIONS = {
 
 interface PomodoroTimerProps {
   currentTask?: string;
-  onComplete?: () => void;
+  onComplete?: (durationMinutes: number) => void;
 }
 
 export function PomodoroTimer({ currentTask = "Fundamentos Matemáticos - Vetores", onComplete }: PomodoroTimerProps) {
@@ -34,7 +34,7 @@ export function PomodoroTimer({ currentTask = "Fundamentos Matemáticos - Vetore
         setTimeLeft((prev) => {
           if (prev <= 1) {
             setIsRunning(false);
-            onComplete?.();
+            onComplete?.(Math.floor(TIMER_DURATIONS[mode] / 60));
             return 0;
           }
           return prev - 1;
@@ -43,7 +43,7 @@ export function PomodoroTimer({ currentTask = "Fundamentos Matemáticos - Vetore
     }
 
     return () => clearInterval(interval);
-  }, [isRunning, timeLeft, onComplete]);
+  }, [isRunning, timeLeft, onComplete, mode]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;

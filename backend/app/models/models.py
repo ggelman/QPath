@@ -82,7 +82,10 @@ class User(UserBase, BaseModel, table=True):
     # Relationships
     gamification_profile: Optional["GamificationProfile"] = Relationship(back_populates="user")
     activity_logs: List["ActivityLog"] = Relationship(back_populates="user")
-    project_submissions: List["UserProjectSubmission"] = Relationship(back_populates="user")
+    project_submissions: List["UserProjectSubmission"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "[UserProjectSubmission.user_id]"},
+    )
 
 
 class UserCreate(UserBase):
@@ -197,9 +200,12 @@ class UserProjectSubmissionBase(SQLModel):
 class UserProjectSubmission(UserProjectSubmissionBase, BaseModel, table=True):
     """User project submission table model"""
     __tablename__ = "user_project_submissions"
-    
+
     # Relationships
-    user: Optional[User] = Relationship(back_populates="project_submissions")
+    user: Optional[User] = Relationship(
+        back_populates="project_submissions",
+        sa_relationship_kwargs={"foreign_keys": "[UserProjectSubmission.user_id]"},
+    )
 
 
 class UserProjectSubmissionCreate(SQLModel):

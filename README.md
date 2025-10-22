@@ -100,11 +100,50 @@ npm run dev
 
 ### **Scripts Disponíveis**
 ```bash
-npm run dev      # Desenvolvimento com hot reload
-npm run build    # Build para produção
-npm run lint     # Verificação de código
-npm run preview  # Preview da build
+npm run dev         # Desenvolvimento com hot reload
+npm run build       # Build para produção
+npm run lint        # Verificação de código
+npm run preview     # Preview da build
+npm run test        # Testes de frontend (Vitest)
+npm run test:watch  # Testes em modo observação
+npm run test:coverage  # Relatório de cobertura do frontend
 ```
+
+### 🧪 **Testes Automatizados**
+
+#### Frontend (Vitest + React Testing Library)
+```bash
+# Executar a suíte uma vez (modo CI)
+npm install
+npm run test
+
+# Modo interativo para desenvolvimento
+npm run test:watch
+
+# Cobertura com relatório em ./coverage
+npm run test:coverage
+```
+
+- O Vitest exibe os resultados no terminal, destacando testes com sucesso ✅ e falhas ❌.
+- O relatório HTML de cobertura fica disponível em `coverage/index.html` após `npm run test:coverage`.
+
+#### Backend (Pytest)
+```bash
+cd backend
+poetry install --with dev
+
+# Execução completa
+poetry run pytest
+
+# Com cobertura (-cov usa pytest-cov)
+poetry run pytest --cov
+```
+
+- A saída do Pytest mostra a contagem de testes executados e eventuais falhas com o stack trace completo.
+- O relatório de cobertura textual é exibido no terminal; use `--cov-report=html` para gerar arquivos em `backend/htmlcov`.
+
+#### Integração Contínua
+- O workflow `CI Tests` (`.github/workflows/tests.yml`) executa as suítes de frontend e backend em cada push ou Pull Request, garantindo execuções em ambiente limpo.
 
 ---
 

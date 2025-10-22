@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: qpath_postgres
+    environment:
+      POSTGRES_DB: qpath
+      POSTGRES_USER: qpath_user
+      POSTGRES_PASSWORD: qpath_dev_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qpath_user -d qpath"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: qpath_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qpath_backend
+    environment:
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD:-please_set_password_env_var}
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=qpath
+      - DATABASE_USER=qpath_user
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./app
+          target: /app/app
+        - action: rebuild
+          path: pyproject.toml
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -14,6 +14,7 @@ Esta auditoria lista todos os artefatos textuais que existiam antes da consolida
 | `docs/DEPENDENCIAS.md` | ❌ Removido | Dados reorganizados em `docs/architecture/tech-stack.md`. | Tabelas revisadas e atualizadas. |
 | `docs/FASE_1_DETALHADA.md` | 📁 Arquivo Histórico | Mantido como referência legada. | Linkado a partir do índice como relatório histórico. |
 | `docs/PlanoDeAcao_formatado.md` | 📁 Arquivo Histórico | Mantido como plano estratégico completo. | Referenciado na nova árvore sob "Estratégia". |
+| `docs/roadmap/quality-assurance.md` | ✅ Ativo | Backlog dedicado a QA (testes frontend e auditoria de duplicidades). | Complementa o roadmap técnico com tarefas de estabilidade. |
 | Arquivos `.docx` em `docs/` | 📁 Arquivo Histórico | Não alterados. | Requerem ferramentas externas; mantidos para consulta. |
 | `backend/README.md` | ✅ Ativo | Referenciado como fonte oficial de setup do backend. | Não duplicado em `docs/` para evitar divergência. |
 
